@@ -1,10 +1,15 @@
-"""AntiGravity CLI - Termux + Google Integration
+"""AntiGravity - AI-Powered Development Platform for Termux
 
-A powerful terminal utility for Termux Android that integrates with
-Google Drive, Cloud Storage, and modern development tools.
+An intelligent development system that uses AI to:
+- Generate code from natural language descriptions
+- Build complete applications
+- Deploy to GitHub
+- Execute tasks autonomously
+- Manage projects
+
+Powered by Gemini API or Claude API
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __author__ = "AntiGravity Contributors"
-__description__ = "Termux CLI with Google Cloud Integration"
-__license__ = "MIT"
+__description__ = "AI-powered development platform for Termux"
