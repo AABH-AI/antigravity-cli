@@ -1,4 +1,4 @@
-"""Entry point for antigravity module"""
+"""Entry point"""
 from .cli import main
 import sys
 
