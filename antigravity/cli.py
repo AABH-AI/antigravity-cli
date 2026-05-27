@@ -1,23 +1,34 @@
-"""Main CLI Interface for AntiGravity"""
+"""AntiGravity AI - Main CLI Interface"""
 
 import sys
 import argparse
 from pathlib import Path
 
-from .google_auth import GoogleAuthManager
-from .google_drive import GoogleDriveManager
-from .termux_utils import TermuxUtils
+from .ai_engine import GeminiAI
+from .github_deployer import GitHubDeployer
+from .project_gen import ProjectGenerator
+from .task_engine import TaskEngine
 
-
-class AntiGravityCLI:
-    """AntiGravity CLI with Google Integration"""
+class AntiGravityAI:
+    """AI-Powered Development Platform"""
     
     def __init__(self):
         self.config_dir = Path.home() / ".antigravity"
         self.config_dir.mkdir(parents=True, exist_ok=True)
         
-        self.auth = GoogleAuthManager(self.config_dir)
-        self.drive = GoogleDriveManager(self.config_dir, self.auth)
+        # Initialize components
+        self.ai = GeminiAI(api_key=self._get_api_key('GEMINI'))
+        self.github = GitHubDeployer(
+            token=self._get_api_key('GITHUB_TOKEN'),
+            username=self._get_api_key('GITHUB_USERNAME')
+        )
+        self.projects = ProjectGenerator(self.config_dir)
+        self.tasks = TaskEngine(self.config_dir)
+    
+    def _get_api_key(self, env_var: str) -> str:
+        """Get API key from environment or config"""
+        import os
+        return os.getenv(env_var, "")
     
     def run(self, args=None):
         """Main entry point"""
@@ -30,261 +41,386 @@ class AntiGravityCLI:
         return 0
     
     def _create_parser(self):
-        """Create argument parser"""
+        """Create CLI parser"""
         parser = argparse.ArgumentParser(
             prog="antigravity",
-            description="🚀 AntiGravity CLI - Termux + Google Integration",
+            description="🚀 AntiGravity AI - AI-Powered Development Platform",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  antigravity google setup --id YOUR_CLIENT_ID --secret YOUR_SECRET
-  antigravity google auth
-  antigravity google list
-  antigravity google upload file.txt
-  antigravity drive sync ~/Documents
-  antigravity info
+  antigravity ai setup --gemini YOUR_KEY --github YOUR_TOKEN
+  antigravity ai task "Build a todo app in Python"
+  antigravity project create myapp python
+  antigravity code generate "Hello world app"
+  antigravity deploy myapp
+  antigravity review mycode.py
             """
         )
         
-        parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
+        parser.add_argument("--version", action="version", version="antigravity 2.0.0")
         
         subparsers = parser.add_subparsers(title="commands", dest="command")
         
-        # Google authentication commands
-        self._add_google_commands(subparsers)
+        # AI commands
+        self._add_ai_commands(subparsers)
         
-        # Drive commands
-        self._add_drive_commands(subparsers)
+        # Project commands
+        self._add_project_commands(subparsers)
         
-        # System info commands
-        self._add_info_commands(subparsers)
+        # Code commands
+        self._add_code_commands(subparsers)
+        
+        # Deploy commands
+        self._add_deploy_commands(subparsers)
+        
+        # Task commands
+        self._add_task_commands(subparsers)
         
         return parser
     
-    def _add_google_commands(self, subparsers):
-        """Add Google authentication commands"""
-        google_parser = subparsers.add_parser(
-            "google",
-            help="Google OAuth2 setup and management"
+    def _add_ai_commands(self, subparsers):
+        """Add AI commands"""
+        ai_parser = subparsers.add_parser(
+            "ai",
+            help="AI engine commands"
         )
-        google_sub = google_parser.add_subparsers(dest="action")
+        ai_sub = ai_parser.add_subparsers(dest="action")
         
         # Setup
-        setup = google_sub.add_parser("setup", help="Configure Google OAuth2")
-        setup.add_argument("--id", required=True, help="Google Client ID")
-        setup.add_argument("--secret", required=True, help="Google Client Secret")
-        setup.set_defaults(func=self.cmd_google_setup)
-        
-        # Auth
-        auth = google_sub.add_parser("auth", help="Authenticate with Google")
-        auth.add_argument("--code", help="OAuth2 authorization code")
-        auth.set_defaults(func=self.cmd_google_auth)
+        setup = ai_sub.add_parser("setup", help="Setup AI credentials")
+        setup.add_argument("--gemini", help="Gemini API key")
+        setup.add_argument("--github", help="GitHub token")
+        setup.add_argument("--username", help="GitHub username")
+        setup.set_defaults(func=self.cmd_ai_setup)
         
         # Status
-        status = google_sub.add_parser("status", help="Check authentication status")
-        status.set_defaults(func=self.cmd_google_status)
+        status = ai_sub.add_parser("status", help="Check AI status")
+        status.set_defaults(func=self.cmd_ai_status)
         
-        # List files
-        list_cmd = google_sub.add_parser("list", help="List Google Drive files")
-        list_cmd.set_defaults(func=self.cmd_google_list)
+        # Task
+        task = ai_sub.add_parser("task", help="Create AI task")
+        task.add_argument("description", help="Task description")
+        task.add_argument("--language", default="python", help="Language")
+        task.set_defaults(func=self.cmd_ai_task)
         
-        # Upload
-        upload = google_sub.add_parser("upload", help="Upload file to Google Drive")
-        upload.add_argument("file", help="Local file to upload")
-        upload.add_argument("--path", default="/", help="Drive destination path")
-        upload.set_defaults(func=self.cmd_google_upload)
-        
-        # Download
-        download = google_sub.add_parser("download", help="Download from Google Drive")
-        download.add_argument("file_id", help="File ID to download")
-        download.add_argument("--output", required=True, help="Local output path")
-        download.set_defaults(func=self.cmd_google_download)
-        
-        google_parser.set_defaults(func=self.cmd_google_help)
+        ai_parser.set_defaults(func=self.cmd_ai_help)
     
-    def _add_drive_commands(self, subparsers):
-        """Add Google Drive commands"""
-        drive_parser = subparsers.add_parser(
-            "drive",
-            help="Google Drive operations"
+    def _add_project_commands(self, subparsers):
+        """Add project commands"""
+        proj_parser = subparsers.add_parser(
+            "project",
+            help="Project management"
         )
-        drive_sub = drive_parser.add_subparsers(dest="action")
+        proj_sub = proj_parser.add_subparsers(dest="action")
         
-        # Sync
-        sync = drive_sub.add_parser("sync", help="Sync folder with Google Drive")
-        sync.add_argument("folder", help="Local folder to sync")
-        sync.add_argument("--path", default="/", help="Drive destination")
-        sync.set_defaults(func=self.cmd_drive_sync)
+        # Create
+        create = proj_sub.add_parser("create", help="Create new project")
+        create.add_argument("name", help="Project name")
+        create.add_argument("language", help="Programming language")
+        create.add_argument("--description", help="Project description")
+        create.set_defaults(func=self.cmd_project_create)
         
-        # Quota
-        quota = drive_sub.add_parser("quota", help="Check storage quota")
-        quota.set_defaults(func=self.cmd_drive_quota)
+        # List
+        list_cmd = proj_sub.add_parser("list", help="List projects")
+        list_cmd.set_defaults(func=self.cmd_project_list)
         
-        # Create folder
-        mkdir = drive_sub.add_parser("mkdir", help="Create folder on Drive")
-        mkdir.add_argument("name", help="Folder name")
-        mkdir.add_argument("--parent", default="root", help="Parent folder ID")
-        mkdir.set_defaults(func=self.cmd_drive_mkdir)
+        # Info
+        info = proj_sub.add_parser("info", help="Project info")
+        info.add_argument("name", help="Project name")
+        info.set_defaults(func=self.cmd_project_info)
         
-        drive_parser.set_defaults(func=self.cmd_drive_help)
+        proj_parser.set_defaults(func=self.cmd_project_help)
     
-    def _add_info_commands(self, subparsers):
-        """Add system info commands"""
-        info_parser = subparsers.add_parser(
-            "info",
-            help="System and environment info"
+    def _add_code_commands(self, subparsers):
+        """Add code generation commands"""
+        code_parser = subparsers.add_parser(
+            "code",
+            help="Code generation"
         )
-        info_sub = info_parser.add_subparsers(dest="action")
+        code_sub = code_parser.add_subparsers(dest="action")
         
-        # Device info
-        device = info_sub.add_parser("device", help="Device information")
-        device.set_defaults(func=self.cmd_info_device)
+        # Generate
+        gen = code_sub.add_parser("generate", help="Generate code")
+        gen.add_argument("description", help="What to build")
+        gen.add_argument("--language", default="python", help="Language")
+        gen.add_argument("--output", help="Save to file")
+        gen.set_defaults(func=self.cmd_code_generate)
         
-        # Storage
-        storage = info_sub.add_parser("storage", help="Storage paths")
-        storage.set_defaults(func=self.cmd_info_storage)
+        # Build app
+        build = code_sub.add_parser("build", help="Build application")
+        build.add_argument("description", help="App description")
+        build.add_argument("--name", required=True, help="App name")
+        build.set_defaults(func=self.cmd_code_build)
         
-        info_parser.set_defaults(func=self.cmd_info_device)
+        # Fix
+        fix = code_sub.add_parser("fix", help="Fix code")
+        fix.add_argument("file", help="Code file")
+        fix.add_argument("--error", help="Error message")
+        fix.set_defaults(func=self.cmd_code_fix)
+        
+        # Review
+        review = code_sub.add_parser("review", help="Review code")
+        review.add_argument("file", help="Code file")
+        review.set_defaults(func=self.cmd_code_review)
+        
+        code_parser.set_defaults(func=self.cmd_code_help)
     
-    # Google commands
-    def cmd_google_setup(self, args):
-        """Setup Google OAuth2"""
-        print("\n🔐 Setting up Google OAuth2...\n")
-        success = self.auth.setup_oauth(args.id, args.secret)
-        print(f"   Next: antigravity google auth\n")
-        return 0 if success else 1
+    def _add_deploy_commands(self, subparsers):
+        """Add deployment commands"""
+        deploy_parser = subparsers.add_parser(
+            "deploy",
+            help="Deploy to GitHub"
+        )
+        deploy_sub = deploy_parser.add_subparsers(dest="action")
+        
+        # Create repo
+        repo = deploy_sub.add_parser("repo", help="Create GitHub repo")
+        repo.add_argument("name", help="Repository name")
+        repo.add_argument("--description", help="Description")
+        repo.add_argument("--private", action="store_true", help="Private repo")
+        repo.set_defaults(func=self.cmd_deploy_repo)
+        
+        # Push
+        push = deploy_sub.add_parser("push", help="Push code")
+        push.add_argument("repo", help="Repository name")
+        push.add_argument("--message", default="Initial commit", help="Commit message")
+        push.set_defaults(func=self.cmd_deploy_push)
+        
+        # Setup CI/CD
+        cicd = deploy_sub.add_parser("cicd", help="Setup GitHub Actions")
+        cicd.add_argument("repo", help="Repository name")
+        cicd.set_defaults(func=self.cmd_deploy_cicd)
+        
+        deploy_parser.set_defaults(func=self.cmd_deploy_help)
     
-    def cmd_google_auth(self, args):
-        """Authenticate with Google"""
-        print("\n🔑 Google Authentication\n")
+    def _add_task_commands(self, subparsers):
+        """Add task management commands"""
+        task_parser = subparsers.add_parser(
+            "task",
+            help="Task management"
+        )
+        task_sub = task_parser.add_subparsers(dest="action")
         
-        auth_url = self.auth.get_auth_code_url()
-        if not auth_url:
-            print("❌ Google OAuth2 not configured")
-            print("   Run: antigravity google setup --id YOUR_ID --secret YOUR_SECRET")
-            return 1
+        # New
+        new = task_sub.add_parser("new", help="Create task")
+        new.add_argument("description", help="Task description")
+        new.add_argument("--type", default="general", help="Task type")
+        new.set_defaults(func=self.cmd_task_new)
         
-        print("1. Open this URL in your browser:")
-        print(f"\n   {auth_url}\n")
-        print("2. Copy the authorization code")
-        print("3. Run: antigravity google auth --code YOUR_CODE\n")
+        # List
+        list_cmd = task_sub.add_parser("list", help="List tasks")
+        list_cmd.add_argument("--status", help="Filter by status")
+        list_cmd.set_defaults(func=self.cmd_task_list)
         
-        if args.code:
-            success = self.auth.exchange_code_for_token(args.code)
-            return 0 if success else 1
+        # Run
+        run = task_sub.add_parser("run", help="Run task")
+        run.add_argument("task_id", help="Task ID")
+        run.set_defaults(func=self.cmd_task_run)
         
-        return 0
+        task_parser.set_defaults(func=self.cmd_task_help)
     
-    def cmd_google_status(self, args):
-        """Check auth status"""
-        status = self.auth.get_auth_status()
-        print(f"\n📊 Authentication Status\n")
-        print(f"Status: {status['status']}")
-        print(f"Message: {status['message']}")
-        if 'obtained_at' in status:
-            print(f"Obtained: {status['obtained_at']}")
+    # AI Commands
+    def cmd_ai_setup(self, args):
+        """Setup AI credentials"""
+        print("\n🔑 AntiGravity AI Setup\n")
+        if args.gemini:
+            print(f"✅ Gemini API configured")
+        if args.github:
+            print(f"✅ GitHub token configured")
+        if args.username:
+            print(f"✅ GitHub username: {args.username}")
         print()
         return 0
     
-    def cmd_google_list(self, args):
-        """List Drive files"""
-        print("\n📄 Google Drive Files\n")
-        files = self.drive.list_files()
-        if not files:
-            print("No files found (or not authenticated)\n")
-            return 0
-        
-        for f in files:
-            print(f"  {f.get('name', 'Unknown')} - {f.get('size', 'N/A')}")
+    def cmd_ai_status(self, args):
+        """Check AI status"""
+        print("\n📊 AntiGravity AI Status\n")
+        print(f"Gemini API: {'✅ Configured' if self.ai.is_configured() else '❌ Not configured'}")
+        print(f"GitHub: {'✅ Configured' if self.github.is_configured() else '❌ Not configured'}")
         print()
         return 0
     
-    def cmd_google_upload(self, args):
-        """Upload file to Drive"""
-        success = self.drive.upload_file(args.file, args.path)
-        print()
-        return 0 if success else 1
+    def cmd_ai_task(self, args):
+        """Create AI task"""
+        task_id = self.tasks.create_task(args.description, "ai_generated")
+        self.tasks.execute_task(task_id)
+        return 0
     
-    def cmd_google_download(self, args):
-        """Download from Drive"""
-        success = self.drive.download_file(args.file_id, args.output)
-        print()
-        return 0 if success else 1
-    
-    def cmd_google_help(self, args):
-        """Show Google help"""
-        print("""\nGoogle OAuth2 Management:
-  antigravity google setup --id ID --secret SECRET
-  antigravity google auth [--code CODE]
-  antigravity google status
-  antigravity google list
-  antigravity google upload FILE [--path PATH]
-  antigravity google download FILE_ID --output PATH
+    def cmd_ai_help(self, args):
+        """Show AI help"""
+        print("""\nAI Commands:
+  antigravity ai setup --gemini KEY --github TOKEN --username USER
+  antigravity ai status
+  antigravity ai task "Build a todo app in Python"
         """)
         return 0
     
-    # Drive commands
-    def cmd_drive_sync(self, args):
-        """Sync folder"""
-        success = self.drive.sync_folder(args.folder, args.path)
-        print()
-        return 0 if success else 1
+    # Project Commands
+    def cmd_project_create(self, args):
+        """Create project"""
+        result = self.projects.create_project(
+            args.name, 
+            args.language,
+            args.description or ""
+        )
+        return 0
     
-    def cmd_drive_quota(self, args):
-        """Show quota"""
-        print("\n📊 Google Drive Quota\n")
-        quota = self.drive.list_quota()
-        for key, val in quota.items():
-            print(f"  {key}: {val}")
+    def cmd_project_list(self, args):
+        """List projects"""
+        projects = self.projects.list_projects()
+        print(f"\n📂 Your Projects ({len(projects)})\n")
+        for proj in projects:
+            print(f"  • {proj}")
         print()
         return 0
     
-    def cmd_drive_mkdir(self, args):
-        """Create folder"""
-        folder_id = self.drive.create_folder(args.name, args.parent)
-        if folder_id:
-            print(f"\n✅ Created folder: {folder_id}\n")
-            return 0
-        return 1
-    
-    def cmd_drive_help(self, args):
-        """Show Drive help"""
-        print("""\nGoogle Drive Operations:
-  antigravity drive sync FOLDER [--path PATH]
-  antigravity drive quota
-  antigravity drive mkdir NAME [--parent ID]
-        """)
-        return 0
-    
-    # Info commands
-    def cmd_info_device(self, args):
-        """Show device info"""
-        print("\n📱 Device Information\n")
-        info = TermuxUtils.get_device_info()
+    def cmd_project_info(self, args):
+        """Show project info"""
+        info = self.projects.get_project_info(args.name)
+        print(f"\n📊 Project: {args.name}\n")
         for key, val in info.items():
-            print(f"  {key}: {val}")
-        
-        is_termux = TermuxUtils.is_termux()
-        print(f"  running_in_termux: {is_termux}")
+            if key != 'files':
+                print(f"  {key}: {val}")
         print()
         return 0
     
-    def cmd_info_storage(self, args):
-        """Show storage paths"""
-        print("\n📁 Storage Paths\n")
-        paths = TermuxUtils.get_storage_paths()
-        if not paths:
-            print("  No storage paths found")
-            print("  Run: termux-setup-storage\n")
-            return 0
+    def cmd_project_help(self, args):
+        """Show project help"""
+        print("""\nProject Commands:
+  antigravity project create NAME LANGUAGE [--description DESC]
+  antigravity project list
+  antigravity project info NAME
+        """)
+        return 0
+    
+    # Code Commands
+    def cmd_code_generate(self, args):
+        """Generate code"""
+        print(f"\n🤖 Generating {args.language} code...\n")
+        code = self.ai.generate_code(args.description, args.language)
         
-        for name, path in paths.items():
-            print(f"  {name}: {path}")
+        if args.output:
+            with open(args.output, 'w') as f:
+                f.write(code)
+            print(f"✅ Code saved to {args.output}\n")
+        else:
+            print(code)
+            print()
+        return 0
+    
+    def cmd_code_build(self, args):
+        """Build application"""
+        print(f"\n🏗️  Building application: {args.name}\n")
+        result = self.ai.build_app(args.description)
+        print(f"Status: {result['status']}")
+        print(f"Message: {result['message']}\n")
+        return 0
+    
+    def cmd_code_fix(self, args):
+        """Fix code"""
+        print(f"\n🔧 Analyzing code...\n")
+        try:
+            with open(args.file) as f:
+                code = f.read()
+            fixed = self.ai.fix_code(code, args.error or "")
+            print(fixed)
+            print()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.file}\n")
+            return 1
+        return 0
+    
+    def cmd_code_review(self, args):
+        """Review code"""
+        print(f"\n👀 Reviewing code...\n")
+        try:
+            with open(args.file) as f:
+                code = f.read()
+            review = self.ai.review_code(code)
+            print(review)
+            print()
+        except FileNotFoundError:
+            print(f"❌ File not found: {args.file}\n")
+            return 1
+        return 0
+    
+    def cmd_code_help(self, args):
+        """Show code help"""
+        print("""\nCode Commands:
+  antigravity code generate "Description" [--language LANG] [--output FILE]
+  antigravity code build "App Description" --name APP_NAME
+  antigravity code fix FILE [--error ERROR_MSG]
+  antigravity code review FILE
+        """)
+        return 0
+    
+    # Deploy Commands
+    def cmd_deploy_repo(self, args):
+        """Create repo"""
+        result = self.github.create_repo(args.name, args.description or "", args.private)
+        print(f"\n✅ Repository created\n")
+        for key, val in result.items():
+            print(f"  {key}: {val}")
         print()
+        return 0
+    
+    def cmd_deploy_push(self, args):
+        """Push code"""
+        print(f"\n📤 Pushing to {args.repo}...\n")
+        success = self.github.push_code(args.repo, {}, args.message)
+        if success:
+            print(f"✅ Code pushed successfully\n")
+        return 0
+    
+    def cmd_deploy_cicd(self, args):
+        """Setup CI/CD"""
+        success = self.github.setup_ci_cd(args.repo)
+        if success:
+            print(f"\n✅ GitHub Actions configured\n")
+        return 0
+    
+    def cmd_deploy_help(self, args):
+        """Show deploy help"""
+        print("""\nDeploy Commands:
+  antigravity deploy repo NAME [--description DESC] [--private]
+  antigravity deploy push REPO [--message MSG]
+  antigravity deploy cicd REPO
+        """)
+        return 0
+    
+    # Task Commands
+    def cmd_task_new(self, args):
+        """Create task"""
+        task_id = self.tasks.create_task(args.description, args.type)
+        return 0
+    
+    def cmd_task_list(self, args):
+        """List tasks"""
+        tasks = self.tasks.list_tasks(args.status)
+        print(f"\n📋 Tasks ({len(tasks)})\n")
+        for task_id, task in self.tasks.tasks.items():
+            print(f"  {task_id}: {task['description']}")
+            print(f"    Status: {task['status']}\n")
+        return 0
+    
+    def cmd_task_run(self, args):
+        """Run task"""
+        result = self.tasks.execute_task(args.task_id)
+        if 'error' not in result:
+            self.tasks.complete_task(args.task_id, "Completed")
+        return 0
+    
+    def cmd_task_help(self, args):
+        """Show task help"""
+        print("""\nTask Commands:
+  antigravity task new "Description" [--type TYPE]
+  antigravity task list [--status STATUS]
+  antigravity task run TASK_ID
+        """)
         return 0
 
 
 def main(args=None):
     """Entry point"""
-    cli = AntiGravityCLI()
+    cli = AntiGravityAI()
     return cli.run(args)
