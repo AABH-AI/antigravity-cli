@@ -6,14 +6,26 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="antigravity-cli",
-    version="0.1.0",
+    version="1.0.0",
     author="AntiGravity Contributors",
-    description="A lightweight CLI tool for Termux with zero error tolerance",
+    description="Termux CLI with Google Drive Integration",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/AABH-AI/antigravity-cli",
     packages=find_packages(),
     python_requires=">=3.8",
-    install_requires=["psutil>=5.4.0"],
-    entry_points={"console_scripts": ["antigravity=antigravity.cli:main"]},
+    install_requires=[],
+    entry_points={
+        "console_scripts": [
+            "antigravity=antigravity.cli:main",
+        ],
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8+",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: Android",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+    ],
 )
