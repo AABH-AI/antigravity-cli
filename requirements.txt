@@ -1,1 +1,10 @@
-antigravity
+# AntiGravity AI - Dependencies
+# All dependencies use stdlib only for Termux compatibility.
+# The Gemini and GitHub APIs are called via urllib (no extra packages needed).
+# Optional: install these for extra features.
+
+# Uncomment if you want richer terminal output:
+# rich>=13.7.0
+
+# Uncomment if you prefer the official Gemini SDK instead of urllib:
+# google-generativeai>=0.8.0
